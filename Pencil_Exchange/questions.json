@@ -1,0 +1,73 @@
+{
+  "instructions_for_llm": "Answer ONLY in valid JSON. Do not include explanations, markdown, or text outside the JSON object.",
+
+  "question_types": [
+
+    {
+      "type": "person_timestep_lookup",
+
+      "question_template": "How many pencils did <PERSON_NAME> have at timestep <TIMESTEP>?",
+
+      "expected_json_format": {
+        "question_type": "person_timestep_lookup",
+        "person": "<PERSON_NAME>",
+        "timestep": "<INTEGER>",
+        "answer": "<INTEGER>"
+      }
+    },
+
+    {
+      "type": "person_value_timesteps",
+
+      "question_template": "At which timesteps did <PERSON_NAME> have exactly <N> pencils? Return all timesteps in ascending order.",
+
+      "expected_json_format": {
+        "question_type": "person_value_timesteps",
+        "person": "<PERSON_NAME>",
+        "pencil_count": "<INTEGER>",
+        "timesteps": ["<INTEGER>", "..."]
+      }
+    },
+
+    {
+      "type": "population_condition",
+
+      "question_template": "At timestep <TIMESTEP>, how many people had [at least / at most / more than / fewer than] <N> pencils?",
+
+      "condition_operators": {
+        "at least N"   : ">=N",
+        "at most N"    : "<=N",
+        "more than N"  : ">N",
+        "fewer than N" : "<N"
+      },
+
+      "expected_json_format": {
+        "question_type": "population_condition",
+        "timestep": "<INTEGER>",
+        "condition": ">=N or <=N or >N or <N",
+        "answer": "<INTEGER>"
+      }
+    },
+
+    {
+      "type": "duration_condition",
+
+      "question_template": "During how many timesteps (t=1 onward) did <PERSON_NAME> have [at least / at most / more than / fewer than] <N> pencils?",
+
+      "condition_operators": {
+        "at least N"   : ">=N",
+        "at most N"    : "<=N",
+        "more than N"  : ">N",
+        "fewer than N" : "<N"
+      },
+
+      "expected_json_format": {
+        "question_type": "duration_condition",
+        "person": "<PERSON_NAME>",
+        "condition": ">=N or <=N or >N or <N",
+        "answer": "<INTEGER>"
+      }
+    }
+
+  ]
+}
