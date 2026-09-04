@@ -1,0 +1,12 @@
+Below is a description of pencil transfers.
+<Text description or whole story about the pencil exchange>
+Question:
+At which timesteps did Srinivasa have exactly 1 pencils? Return all timesteps in ascending order
+Answer ONLY in valid JSON. Do not include explanations, markdown, or text outside the JSON object
+
+        "expected_json_format": {
+        "question_type": "person_value_timesteps",
+        "pe1rson": "<PERSON_NAME>",
+        "pencil_count": "<INTEGER>",
+        "timesteps": ["<INTEGER>", "..."]
+      }
