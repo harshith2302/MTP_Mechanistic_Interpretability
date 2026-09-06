@@ -1,10 +1,13 @@
 # Pencil Exchange behavioral sweep.
 # N == T always (coupled by design; see PROGRESS.md decisions table).
 
-n_values: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-           21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+# Budget: 15 N values x 15 stories x 22 questions = 4,950 prompts per model
+# (~19.8k total). Every even N, which is exactly what plots.py ticks at.
+# Halving stories_per_n roughly doubles every confidence interval; raising
+# stories_per_n is the cheap way to buy power back without touching the x-axis.
+n_values: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
 
-stories_per_n: 20
+stories_per_n: 15
 seed_formula: "1000 * n + story_index"
 
 story:
