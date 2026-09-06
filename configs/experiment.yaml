@@ -1,0 +1,42 @@
+# Pencil Exchange behavioral sweep.
+# N == T always (coupled by design; see PROGRESS.md decisions table).
+
+n_values: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+           21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+
+stories_per_n: 20
+seed_formula: "1000 * n + story_index"
+
+story:
+  pencils_per_person: 5
+  number_word_probability: 0.45
+  names_path: data/names.txt
+
+questions_per_story:
+  scalar_types: 2      # each scalar type sampled this many times per story
+  heavy_types: 1       # trajectory / state_snapshot
+
+# Heavy types get a bigger max_tokens budget; everything else is scalar.
+heavy_types: [trajectory, state_snapshot]
+
+decoding:
+  temperature: 0.0     # greedy. NOT bit-identical across batch size / TP —
+  top_p: 1.0           # keep max_num_seqs and tensor_parallel_size fixed for a sweep.
+  seed: 0
+  max_tokens_scalar: 128
+  max_tokens_heavy: 2048
+  guided_json: false   # MUST stay false: format_error is a measured category.
+
+answer_mode: direct    # JSON only, no chain of thought
+
+engine:
+  tensor_parallel_size: 1
+  gpu_memory_utilization: 0.90
+  max_num_seqs: 64
+  dtype: bfloat16
+  enforce_eager: false
+
+classify:
+  chance_baseline_samples: 1000
+
+output_root: results
