@@ -1,0 +1,39 @@
+{
+  "config": {
+    "num_people": 2,
+    "num_timesteps": 2,
+    "total_pencils": 10
+  },
+  "persons": [
+    "A1",
+    "A2"
+  ],
+  "id_to_name": {
+    "A1": "Clementine",
+    "A2": "Dmitri"
+  },
+  "name_to_id": {
+    "Clementine": "A1",
+    "Dmitri": "A2"
+  },
+  "clusters": {
+    "cluster_1": [
+      "A1",
+      "A2"
+    ]
+  },
+  "ground_truth_pencil_counts": {
+    "t=0": {
+      "A1": 8,
+      "A2": 2
+    },
+    "t=1": {
+      "A1": 0,
+      "A2": 10
+    },
+    "t=2": {
+      "A1": 2,
+      "A2": 8
+    }
+  }
+}

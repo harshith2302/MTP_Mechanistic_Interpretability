@@ -1,0 +1,9 @@
+results/
+models/
+hf_cache/
+envs/
+logs/
+__pycache__/
+*.pyc
+.mplcache/
+.pytest_cache/
