@@ -42,7 +42,10 @@ CONSTRAINTS="$PROJ/envs/mech-constraints.txt"
 echo "torch==${TORCH_PIN}" > "$CONSTRAINTS"
 
 echo "[mech] installing nnsight / transformer_lens against the pinned torch"
-pip install -c "$CONSTRAINTS" nnsight transformer_lens pandas matplotlib pyyaml pytest
+# num2words is not optional: src/simulate.py needs it, and the mech phase
+# regenerates the same stories to build its patching pairs.
+pip install -c "$CONSTRAINTS" nnsight transformer_lens \
+    num2words pyyaml pandas matplotlib pytest
 
 pip freeze > "$PROJ/envs/mech-requirements.lock"
 
@@ -58,11 +61,12 @@ if major != "12":
 print(f"[mech] ok: torch {torch.__version__}, CUDA {torch.version.cuda}")
 PY
 
-python -c "
-import nnsight, transformer_lens, torch
-print('[mech] nnsight', nnsight.__version__, '| transformer_lens', transformer_lens.__version__)
-print('[mech] torch', torch.__version__)
-"
+# transformer_lens exposes no __version__; ask the metadata, not the module.
+python - <<'PY'
+from importlib.metadata import version
+for pkg in ("torch", "nnsight", "transformer-lens", "transformers", "num2words"):
+    print(f"[mech] {pkg:18s} {version(pkg)}")
+PY
 
 echo
 echo "[mech] envs/mech ready, locked to envs/mech-requirements.lock"
@@ -70,3 +74,9 @@ echo "[mech] A renamed venv is a BROKEN venv -- absolute paths are baked into"
 echo "[mech] bin/pip and bin/activate. Rebuild in place, never mv it."
 echo "[mech] Next: sbatch scripts/probe_mech.sbatch to confirm it sees a GPU"
 echo "[mech] and can load a model by local path with no network."
+echo
+echo "[mech] NOTE: this venv resolves a newer transformers than envs/eval"
+echo "[mech] (5.x vs 4.57). Chat-template rendering was verified byte-identical"
+echo "[mech] across that gap for all four models, so the mech phase can reuse the"
+echo "[mech] sweep's prompts. probe_mech.sbatch re-checks it; if it ever fails,"
+echo "[mech] activations would be computed on prompts the sweep never saw."
