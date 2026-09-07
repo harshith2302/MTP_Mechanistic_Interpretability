@@ -7,11 +7,11 @@
 #SBATCH --qos=l40
 #SBATCH --account=25m0834
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=64G
 #SBATCH --time=03:00:00
-#SBATCH --output=logs/%x-%A_%a.out
-#SBATCH --error=logs/%x-%A_%a.err
+#SBATCH --output=/home/cccp/25m0834/MTP_Mechanistic_Interpretability/logs/%x-%A_%a.out
+#SBATCH --error=/home/cccp/25m0834/MTP_Mechanistic_Interpretability/logs/%x-%A_%a.err
 #SBATCH --array=0-3
 
 set -euo pipefail
@@ -21,6 +21,7 @@ cd "$PROJ"
 export HF_HOME="$PROJ/hf_cache" HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 export HF_DATASETS_OFFLINE=1 VLLM_NO_USAGE_STATS=1 DO_NOT_TRACK=1
 export TOKENIZERS_PARALLELISM=false MPLCONFIGDIR="$PROJ/.mplcache"
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-4}"
 mkdir -p "$MPLCONFIGDIR" logs
 source "$PROJ/envs/eval/bin/activate"
 
