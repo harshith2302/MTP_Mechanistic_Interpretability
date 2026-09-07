@@ -247,3 +247,37 @@ def test_chance_baseline_falls_as_n_grows_relative_to_range():
     a = small["person_timestep_lookup"]["label_fire_rates"].get("off_by_small", 0)
     b = large["person_timestep_lookup"]["label_fire_rates"].get("off_by_small", 0)
     assert a > b, "off_by_small must be rarer when the value range is wider"
+
+
+# --- trajectory length mismatch (regression: killed the 2026-09-07 sweep) -----
+# grade.py sets first_divergence_index = min(len(pred), len(gold)) when the two
+# lists agree on their overlap but differ in length. classify.py then indexes
+# BOTH lists with it while guarding only on len(pred), so a prediction LONGER
+# than gold raised IndexError -- and because vLLM's EngineCore subprocess
+# survives the crash, the Slurm job sat in RUNNING doing nothing instead of
+# failing fast. Three of four sweep tasks were lost to this.
+@pytest.mark.parametrize("delta,want", [
+    (-3, "format_error"),   # shorter than gold
+    (-1, "format_error"),
+    (3, "format_error"),    # longer than gold -- this is the case that crashed
+    (1, "format_error"),
+])
+def test_trajectory_length_mismatch_is_format_not_a_crash(delta, want):
+    story, q = _story_and("trajectory")
+    gold = q["gold"]["counts"]
+    pred = gold[:delta] if delta < 0 else gold + [7] * delta
+    r = _cls(q, {"question_type": "trajectory",
+                 "person": q["queried_person"], "counts": pred}, story)
+    assert r["label"] == want
+
+
+def test_trajectory_longer_but_diverging_early_still_gets_a_mechanism():
+    """A too-long list that also disagrees inside the overlap must be labelled at
+    the divergence point, not swept into format_error."""
+    story, q = _story_and("trajectory")
+    gold = q["gold"]["counts"]
+    pred = gold[:3] + [999] + list(gold[4:]) + [7, 7, 7]
+    r = _cls(q, {"question_type": "trajectory",
+                 "person": q["queried_person"], "counts": pred}, story)
+    assert r["first_divergence_index"] == 3
+    assert r["label"] != "format_error"

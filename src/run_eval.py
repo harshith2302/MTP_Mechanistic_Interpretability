@@ -238,7 +238,20 @@ def _generate(llm, sampling, cfg, heavy, fits, run_id, model, n, fh):
             graded = grade(item["question"], parsed, item["story"])
             if parsed is None:
                 graded["status"] = status
-            labels = classify(item["question"], graded, item["story"])
+            # Labelling one record must never abort a 5k-prompt sweep. When it
+            # raised, vLLM's V1 EngineCore subprocess kept the Slurm job in
+            # RUNNING with nothing happening, so the failure burned walltime
+            # instead of failing fast. Degrade the record, keep going, and make
+            # the breakage visible in the data rather than only in a traceback.
+            try:
+                labels = classify(item["question"], graded, item["story"])
+            except Exception as exc:
+                labels = {"label": "unexplained", "labels_matched": [],
+                          "ambiguous": False, "coarse_category": "Unexplained",
+                          "classify_error": f"{type(exc).__name__}: {exc}"}
+                print(f"[run_eval] classify failed on "
+                      f"{item['question']['question_id']}: {labels['classify_error']}",
+                      flush=True)
             rec = base_record(run_id, model, cfg, item, n)
             rec.update(
                 prompt_tokens=item["prompt_tokens"], context_overflow=False,

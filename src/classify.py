@@ -47,9 +47,14 @@ def classify(question, graded, story):
         extra["first_divergence_index"] = div
         extra["recovered"] = graded["detail"].get("recovered")
         extra["error_growth"] = graded["detail"].get("error_growth")
-        if graded["detail"]["length_mismatch"] and (div is None or div >= len(a)):
+        # div indexes BOTH a and gold["counts"], so it has to be in range for
+        # both. On a pure length mismatch grade.py sets div = min(len(pred),
+        # len(gold)), which is out of range for whichever list is shorter --
+        # guarding on len(a) alone crashed on any prediction LONGER than gold.
+        n_common = min(len(a), len(gold["counts"]))
+        if graded["detail"]["length_mismatch"] and (div is None or div >= n_common):
             labels = ["format_error"]
-        elif div is not None and div < len(a):
+        elif div is not None and div < n_common:
             labels = state_value_labels(story, question["queried_person"], div,
                                         gold["counts"][div], a[div])
 
