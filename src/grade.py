@@ -10,6 +10,9 @@ import json
 import re
 
 PARSE_OK = "ok"
+PARSE_OK_REPAIRED = "ok_repaired"
+# Both mean "we have a dict to grade". Anything else is a format failure.
+OK_STATUSES = frozenset({PARSE_OK, PARSE_OK_REPAIRED})
 REFUSAL_PATTERNS = re.compile(
     r"\b(i'm sorry|i am sorry|i cannot|i can't|as an ai|unable to (?:answer|determine)"
     r"|there is not enough information|cannot be determined)\b",
@@ -23,9 +26,21 @@ def _strip_fences(text):
     return re.sub(r"\s*```\s*$", "", text)
 
 
-def _first_balanced_object(text):
-    """Return the first balanced {...} substring, respecting strings/escapes."""
-    depth = 0
+def _first_balanced_object(text, allow_repair=False):
+    """First balanced {...} substring, respecting strings and escapes.
+
+    -> (substring, was_repaired) or (None, False).
+
+    With `allow_repair`, an object left open at end of text has its missing
+    closers appended. Mistral-7B-v0.3 ends a great many otherwise-perfect
+    answers one "}" short with finish_reason=stop; scoring those as
+    format_error would have cost it ~37% of its records and filled its
+    taxonomy with a category it did not earn.
+
+    Repair is refused when the text ends INSIDE a string, because a cut-off
+    string value is genuinely lost content, not a missing delimiter.
+    """
+    stack = []
     start = None
     in_str = False
     esc = False
@@ -40,16 +55,22 @@ def _first_balanced_object(text):
             continue
         if ch == '"':
             in_str = True
-        elif ch == "{":
-            if depth == 0:
+        elif ch in "{[":
+            if ch == "{" and not stack:
                 start = i
-            depth += 1
-        elif ch == "}":
-            if depth:
-                depth -= 1
-                if depth == 0:
-                    return text[start:i + 1]
-    return None
+            if start is not None:
+                stack.append(ch)
+        elif ch in "}]":
+            if stack and stack[-1] == ("{" if ch == "}" else "["):
+                stack.pop()
+                if not stack and start is not None:
+                    return text[start:i + 1], False
+    if not (allow_repair and stack and start is not None and not in_str):
+        return None, False
+    body = text[start:].rstrip()
+    body = re.sub(r",\s*$", "", body)          # a dangling comma would be invalid
+    closers = "".join("}" if ch == "{" else "]" for ch in reversed(stack))
+    return body + closers, True
 
 
 def parse_answer(raw_text, finish_reason=None):
@@ -59,20 +80,23 @@ def parse_answer(raw_text, finish_reason=None):
     if REFUSAL_PATTERNS.search(raw_text) and "{" not in raw_text:
         return None, "refusal"
     body = _strip_fences(raw_text)
-    candidate = _first_balanced_object(body)
+    # finish_reason "length" means the token budget cut the answer off, so the
+    # content itself is missing and repairing delimiters would invent an answer.
+    # "stop" means the model chose to end: only delimiters can be absent.
+    truncated_by_budget = finish_reason == "length"
+    candidate, repaired = _first_balanced_object(
+        body, allow_repair=not truncated_by_budget)
     if candidate is None:
-        if finish_reason == "length":
-            return None, "truncated"
-        return None, "no_json_found"
+        return None, "truncated" if truncated_by_budget else "no_json_found"
     try:
         parsed = json.loads(candidate)
     except json.JSONDecodeError:
-        if finish_reason == "length":
+        if truncated_by_budget:
             return None, "truncated"
         return None, "invalid_json"
     if not isinstance(parsed, dict):
         return None, "invalid_json"
-    return parsed, PARSE_OK
+    return parsed, PARSE_OK_REPAIRED if repaired else PARSE_OK
 
 
 # --- coercion -----------------------------------------------------------------
@@ -146,12 +170,18 @@ _SCALAR_INT_TYPES = {
 }
 
 
-def grade(question, parsed, story=None):
-    """-> {correct, gold, pred, status, detail}. `status` refines parse_status."""
+def grade(question, parsed, story=None, parse_status=None):
+    """-> {correct, gold, pred, status, detail}. `status` refines parse_status.
+
+    `parse_status` is threaded through only so the classifier can tell a list
+    that the model actually wrote short from one our delimiter repair closed
+    early -- the two deserve different labels.
+    """
     qtype = question["question_type"]
     gold = question["gold"]
     out = {"correct": False, "gold": gold, "pred": None,
-           "status": PARSE_OK, "detail": {}}
+           "status": PARSE_OK,
+           "detail": {"repaired": parse_status == PARSE_OK_REPAIRED}}
 
     if parsed is None:
         out["status"] = "missing"

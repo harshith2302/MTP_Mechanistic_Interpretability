@@ -8,7 +8,7 @@ Coarse categories are the 9 from Papers.md §7 plus Conservation and Unexplained
 COARSE = {
     "format_error": "Format", "refusal_or_truncation": "Format",
     "wrong_question_type": "Format", "missing_fields": "Format",
-    "bad_types": "Format",
+    "bad_types": "Format", "incomplete_answer": "Format",
     "out_of_range": "Conservation", "conservation_violation": "Conservation",
     "invariant_violation": "Conservation",
     "binding_person": "Binding", "permutation": "Binding",
@@ -25,13 +25,14 @@ COARSE = {
     "condition_flip": "Arithmetic",
     "digit_error": "Digit",
     "referent_adjacent": "Referent", "comparison_error": "Referent",
+    "degenerate_sequence": "Degenerate",
     "unexplained": "Unexplained", "correct": "Correct",
 }
 
 PRIORITY = [
     "format_error", "refusal_or_truncation", "wrong_question_type",
-    "missing_fields", "bad_types",
-    "out_of_range",
+    "missing_fields", "bad_types", "incomplete_answer",
+    "out_of_range", "degenerate_sequence",
     "permutation", "omission_1", "omission_2", "omission_3",
     "over_application", "direction_flip_one", "direction_flip_all",
     "direction_confusion", "included_t0", "excluded_t0", "condition_flip",

@@ -27,6 +27,20 @@ COLOURS = {
 CATEGORY_ORDER = ["Binding", "Arithmetic", "Digit", "Omission", "Over-application",
                   "Direction", "Referent", "Temporal", "Conservation", "Unexplained"]
 MIN_VALID = 5          # do not plot a point backed by fewer than this many records
+# A cell that context overflow has mostly emptied is not "the model's accuracy at
+# this N": the surviving questions are the shortest stories and the scalar types,
+# a biased subsample. OLMo-2 keeps 20/330 records at N=24 and 6/330 at N=26.
+# Plotting those next to a full cell would invite a false comparison.
+MIN_COVERAGE = 0.50
+
+
+def _drop_biased_cells(d):
+    """Remove points where overflow removed more than half the questions."""
+    if "n_overflow" not in d.columns:
+        return d
+    asked = d["n_valid"] + d["n_overflow"]
+    keep = (asked == 0) | (d["n_valid"] / asked.where(asked > 0, 1) >= MIN_COVERAGE)
+    return d[keep]
 
 
 def _style(ax, xlabel="N = T (people = timesteps)", ylabel=None):
@@ -45,17 +59,23 @@ def _save(fig, out, name):
     print(f"[plots] {name}.png / .pdf")
 
 
-def _truncation_note(ax, acc, model):
-    """Annotate where a model's line stops because of context overflow."""
+def _truncation_note(ax, acc, model, last_plotted):
+    """Mark where a model's line stops because its context ran out.
+
+    The line ENDS here; these points are excluded from every denominator and are
+    never drawn as 0% accuracy. Drawing them as zero would be the single easiest
+    way to make this figure say something false.
+    """
     ov = acc[(acc.model == model) & (acc.n_overflow > 0)]
-    if ov.empty:
+    if ov.empty or last_plotted is None:
         return
-    first = int(ov["n"].min())
-    ax.axvline(first, color=COLOURS.get(model, "grey"), ls=":", lw=1, alpha=0.7)
-    ax.annotate(f"{model.split('-')[0]} context limit\n(first overflow at N={first};\n"
-                f"overflow excluded, not scored 0)",
-                xy=(first, 0.05), xytext=(first + 0.6, 0.16), fontsize=7,
-                color=COLOURS.get(model, "grey"))
+    c = COLOURS.get(model, "grey")
+    ax.axvline(last_plotted, color=c, ls=":", lw=1, alpha=0.7)
+    ax.annotate(f"{model.split('-')[0]}-2 context limit\n"
+                f"line ends at N={int(last_plotted)}; beyond this the prompt\n"
+                f"exceeds 4096 tokens (excluded, not scored 0%)",
+                xy=(last_plotted, 0.04), xytext=(last_plotted - 8.5, 0.055),
+                fontsize=6.5, color=c)
 
 
 def _declutter(labels, min_gap):
@@ -72,7 +92,8 @@ def _declutter(labels, min_gap):
 
 
 def fig1_headline(acc, out):
-    d = acc[(acc.question_type == "ALL") & (acc.n_valid >= MIN_VALID)]
+    d = _drop_biased_cells(acc[(acc.question_type == "ALL")
+                               & (acc.n_valid >= MIN_VALID)])
     fig, ax = plt.subplots(figsize=(8.2, 4.6))
     ends = []
     for model, g in d.groupby("model"):
@@ -82,7 +103,7 @@ def fig1_headline(acc, out):
         ax.fill_between(g["n"], g["ci_low"], g["ci_high"], color=c, alpha=0.13, lw=0)
         last = g.iloc[-1]
         ends.append((float(last["accuracy"]), model, (float(last["n"]), float(last["accuracy"]))))
-        _truncation_note(ax, acc[acc.question_type == "ALL"], model)
+        _truncation_note(ax, acc[acc.question_type == "ALL"], model, float(last["n"]))
     xmax = d["n"].max()
     for y, model, (x0, y0) in _declutter(ends, 0.045):
         c = COLOURS.get(model)
@@ -93,13 +114,21 @@ def fig1_headline(acc, out):
     _style(ax, ylabel="accuracy (95% Wilson CI)")
     ax.set_ylim(0, 1)
     ax.set_xticks([n for n in sorted(d["n"].unique()) if n % 2 == 0])
-    ax.set_title("Pencil Exchange: accuracy collapses as N = T grows", loc="left")
+    ax.set_title("Accuracy falls to a ~22% floor by N \u2248 12, then flattens",
+                 loc="left", pad=26)
+    ax.text(0.0, 1.02, "All four models are indistinguishable past N = 12. The "
+            "floor is carried by the high-chance question types\n(total_conservation, "
+            "pairwise_comparison) and the zero-arithmetic control "
+            "(initial_state_lookup) \u2014 see figure 2; it is not residual "
+            "state-tracking skill.",
+            transform=ax.transAxes, fontsize=6.8, color="0.35", va="bottom")
     ax.set_xlim(right=xmax + 9)
     _save(fig, out, "fig1_accuracy_headline")
 
 
 def fig2_by_question_type(acc, out):
-    d = acc[(acc.question_type != "ALL") & (acc.n_valid >= MIN_VALID)]
+    d = _drop_biased_cells(acc[(acc.question_type != "ALL")
+                               & (acc.n_valid >= MIN_VALID)])
     types = sorted(d["question_type"].unique())
     ncol = 4
     nrow = -(-len(types) // ncol)
@@ -178,7 +207,8 @@ def fig4_divergence(div, out):
 
 
 def fig5_diagnostics(acc, out):
-    d = acc[(acc.question_type == "ALL") & (acc.n_valid >= MIN_VALID)]
+    d = _drop_biased_cells(acc[(acc.question_type == "ALL")
+                               & (acc.n_valid >= MIN_VALID)])
     fig, (a1, a2) = plt.subplots(1, 2, figsize=(9.2, 3.6), sharex=True)
     for model, g in d.groupby("model"):
         g = g.sort_values("n")
