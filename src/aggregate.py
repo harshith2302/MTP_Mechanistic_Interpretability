@@ -179,17 +179,31 @@ def taxonomy_table(df, cfg, with_chance=True):
 
 
 def divergence_table(df):
+    """Mean first divergence index from `trajectory`, over real tracking attempts.
+
+    Degenerate answers (a constant list or an arithmetic progression) and
+    repair-shortened ones are EXCLUDED: they diverge at index 0-1 by
+    construction, so leaving them in drags the mean toward zero and would make
+    tracking look like it fails earlier than it does. `n_excluded` records how
+    many were dropped, because for OLMo-2 that is most of them.
+    """
     traj = df[(df.question_type == "trajectory") & (~df["context_overflow"])].copy()
-    if "first_divergence_index" not in traj:
+    if traj.empty or "first_divergence_index" not in traj:
         return pd.DataFrame()
-    traj = traj[traj["first_divergence_index"].notna()]
-    if traj.empty:
+    excluded = traj["label"].isin(["degenerate_sequence", "incomplete_answer"])
+    real = traj[~excluded & traj["first_divergence_index"].notna()]
+    if real.empty:
         return pd.DataFrame()
-    g = traj.groupby(["model", "n_people"])["first_divergence_index"]
-    out = g.agg(["mean", "median", "count", "std"]).reset_index()
+    out = (real.groupby(["model", "n_people"])["first_divergence_index"]
+           .agg(["mean", "median", "count", "std"]).reset_index())
+    drop = (traj[excluded].groupby(["model", "n_people"]).size()
+            .rename("n_excluded").reset_index())
+    out = out.merge(drop, on=["model", "n_people"], how="left")
+    out["n_excluded"] = out["n_excluded"].fillna(0).astype(int)
     return out.rename(columns={"n_people": "n", "mean": "mean_first_divergence",
                                "median": "median_first_divergence",
-                               "count": "n_diverged", "std": "std_first_divergence"})
+                               "count": "n_diverged",
+                               "std": "std_first_divergence"})
 
 
 def main():

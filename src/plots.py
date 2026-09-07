@@ -24,8 +24,14 @@ COLOURS = {
     "Mistral-7B-Instruct-v0.3": "#4f9d69",
     "OLMo-2-1124-7B-Instruct": "#d4a017",
 }
-CATEGORY_ORDER = ["Binding", "Arithmetic", "Digit", "Omission", "Over-application",
-                  "Direction", "Referent", "Temporal", "Conservation", "Unexplained"]
+CATEGORY_ORDER = ["Binding", "Arithmetic", "Omission", "Over-application",
+                  "Direction", "Digit", "Temporal", "Degenerate",
+                  "Referent", "Conservation", "Unexplained"]
+# The uniform-integer null over-fires so badly for these three that their
+# corrected rates land at -3% to -29%. They are reported observed-only in the
+# writeup and are clipped out of this figure rather than drawn as zero-height
+# slices that imply a measured absence.
+NOT_CHANCE_CORRECTABLE = {"Referent", "Conservation", "Unexplained"}
 MIN_VALID = 5          # do not plot a point backed by fewer than this many records
 # A cell that context overflow has mostly emptied is not "the model's accuracy at
 # this N": the surviving questions are the shortest stories and the scalar types,
@@ -155,41 +161,68 @@ def fig2_by_question_type(acc, out):
     _save(fig, out, "fig2_by_question_type")
 
 
-def fig3_failure_composition(tax, out):
+def fig3_failure_composition(tax, out, acc=None):
+    """Chance-corrected composition of the mechanistic wrong answers.
+
+    Only categories whose null is usable are drawn; see NOT_CHANCE_CORRECTABLE.
+    Cells that context overflow has mostly emptied are dropped, matching fig1.
+    """
+    if acc is not None and "n_overflow" in acc.columns:
+        allowed = _drop_biased_cells(acc[acc.question_type == "ALL"])
+        keep = set(zip(allowed["model"], allowed["n"]))
+        tax = tax[[(m, n) in keep for m, n in zip(tax["model"], tax["n"])]]
+    tax = tax[~tax["coarse_category"].isin(NOT_CHANCE_CORRECTABLE)]
     models = sorted(tax["model"].unique())
-    fig, axes = plt.subplots(1, len(models), figsize=(3.6 * len(models), 3.4),
-                             sharey=True, squeeze=False)
+    if not models:
+        return
+    cats = [c for c in CATEGORY_ORDER if c in set(tax["coarse_category"])]
     cmap = plt.get_cmap("tab10")
     colours = {c: cmap(i % 10) for i, c in enumerate(CATEGORY_ORDER)}
+
+    fig, axes = plt.subplots(1, len(models), figsize=(2.9 * len(models), 3.6),
+                             sharey=True, squeeze=False)
     for ax, model in zip(axes[0], models):
-        g = tax[tax.model == model]
-        piv = g.pivot_table(index="n", columns="coarse_category",
-                            values="corrected_rate", fill_value=0.0)
-        cols = [c for c in CATEGORY_ORDER if c in piv.columns]
+        piv = tax[tax.model == model].pivot_table(
+            index="n", columns="coarse_category", values="corrected_rate",
+            fill_value=0.0)
         bottom = None
-        for c in cols:
-            ax.bar(piv.index, piv[c].clip(lower=0), bottom=bottom, width=0.85,
+        for c in cats:
+            if c not in piv.columns:
+                continue
+            vals = piv[c].clip(lower=0)
+            ax.bar(piv.index, vals, bottom=bottom, width=1.4,
                    color=colours[c], label=c, linewidth=0)
-            bottom = piv[c].clip(lower=0) if bottom is None else bottom + piv[c].clip(lower=0)
+            bottom = vals if bottom is None else bottom + vals
         ax.set_title(model, fontsize=8, loc="left")
         _style(ax, xlabel="N = T")
-    axes[0][0].set_ylabel("chance-corrected share of wrong answers")
-    # categories that fire BELOW chance are clipped at 0, so bars do not sum to 1
-    axes[0][0].text(0.0, -0.30, "Bars are observed minus chance; categories firing "
-                    "below chance are clipped at 0, so bars need not sum to 1.",
-                    transform=axes[0][0].transAxes, fontsize=7, color="0.35")
+        ax.set_xticks([n for n in piv.index if n % 4 == 2])
+    axes[0][0].set_ylabel("chance-corrected share\nof mechanistic wrong answers")
     h, l = axes[0][0].get_legend_handles_labels()
-    fig.legend(h, l, loc="lower center", ncol=6, fontsize=7, frameon=False,
-               bbox_to_anchor=(0.5, -0.10))
-    fig.suptitle("Failure composition, chance-corrected "
-                 "(format errors excluded and reported separately)",
-                 fontsize=10, x=0.01, ha="left")
-    fig.tight_layout()
+    fig.legend(h, l, loc="lower center", ncol=len(cats), fontsize=7,
+               frameon=False, bbox_to_anchor=(0.5, -0.06))
+    fig.suptitle("Failure composition, chance-corrected", fontsize=10,
+                 x=0.005, ha="left", y=1.04)
+    fig.text(0.005, 0.97,
+             "Format errors excluded and reported separately. Bars are observed "
+             "minus chance and are clipped at 0, so they need not sum to 1. "
+             "Referent, Conservation\nand Unexplained are omitted: the "
+             "uniform-integer null over-fires for them (corrected rates of "
+             "\u22123% to \u221229%), so their corrected values are not "
+             "interpretable.",
+             fontsize=6.5, color="0.35", ha="left", va="top")
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
     _save(fig, out, "fig3_failure_composition")
 
 
+MIN_DIVERGED = 5       # excluding formulaic answers leaves some cells very thin
+
+
 def fig4_divergence(div, out):
-    fig, ax = plt.subplots(figsize=(6.4, 4.2))
+    if "n_diverged" in div.columns:
+        div = div[div["n_diverged"] >= MIN_DIVERGED]
+    if div.empty:
+        return
+    fig, ax = plt.subplots(figsize=(7.0, 4.4))
     ns = sorted(div["n"].unique())
     ax.plot(ns, ns, ls="--", lw=1, color="0.55")
     ax.annotate("perfect tracking (y = T)", xy=(ns[-1], ns[-1]),
@@ -200,9 +233,15 @@ def fig4_divergence(div, out):
         ax.plot(g["n"], g["mean_first_divergence"], marker="o", ms=3.5, lw=1.8,
                 color=COLOURS.get(model), label=model)
     _style(ax, xlabel="T (timesteps)", ylabel="mean first divergence index")
-    ax.legend(fontsize=8, frameon=False)
-    ax.set_title("Where state tracking breaks, from the trajectory question",
-                 loc="left")
+    ax.legend(fontsize=8, frameon=False, loc="upper left")
+    ax.set_title("Tracking leaves the true trajectory almost immediately, at every T",
+                 loc="left", pad=22)
+    ax.text(0.0, 1.015,
+            "From the trajectory question. Formulaic answers (a constant list or "
+            "an arithmetic progression) and repair-shortened ones are excluded \u2014 "
+            "they diverge at\nindex 0\u20131 by construction. Models reproduce t=0 "
+            "and then leave the true trajectory at once; this is not gradual drift.",
+            transform=ax.transAxes, fontsize=6.8, color="0.35", va="bottom")
     _save(fig, out, "fig4_first_divergence")
 
 
@@ -244,7 +283,7 @@ def main():
     if os.path.exists(tax_path):
         tax = pd.read_csv(tax_path)
         if not tax.empty:
-            fig3_failure_composition(tax, args.out)
+            fig3_failure_composition(tax, args.out, acc)
 
     div_path = os.path.join(args.tables, "divergence_by_model_n.csv")
     if os.path.exists(div_path):
