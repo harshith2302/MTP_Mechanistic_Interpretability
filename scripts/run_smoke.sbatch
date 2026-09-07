@@ -80,29 +80,46 @@ find results/raw -name '*smoke*' -type d | while read -r d; do
 done
 
 echo
-echo "===== 5. parse_status breakdown (the thing to actually read) ====="
+echo "===== 5. the numbers to actually read ====="
 python - <<'PY'
 import glob, json, collections
-files = glob.glob("results/raw/*smoke*/**/*.jsonl", recursive=True)
-if not files:
+# N*.jsonl only -- prompts.jsonl is the prompt store, not results. Globbing it in
+# doubles every denominator with phantom records that have no parse_status.
+files = sorted(glob.glob("results/raw/*smoke*/**/N*.jsonl", recursive=True))
+recs = [json.loads(l) for f in files for l in open(f, encoding="utf-8") if l.strip()]
+if not recs:
     print("  no smoke records found"); raise SystemExit
-st, ov, corr, tot = collections.Counter(), 0, 0, 0
-for fp in files:
-    for line in open(fp, encoding="utf-8"):
-        if not line.strip():
-            continue
-        r = json.loads(line)
-        if r.get("context_overflow"):
-            ov += 1
-            continue
-        tot += 1
-        st[r.get("parse_status", "?")] += 1
-        corr += bool(r.get("correct"))
-for k, v in st.most_common():
-    print(f"  parse_status {k:22s} {v:5d}  ({v/max(tot,1):6.1%})")
-print(f"  context_overflow (excluded)   {ov:5d}")
-print(f"  accuracy over graded          {corr}/{tot} = {corr/max(tot,1):.1%}")
+byN = collections.defaultdict(lambda: {"tot": 0, "corr": 0, "ov": 0,
+                                       "ps": collections.Counter()})
+for r in recs:
+    d = byN[r["n_people"]]
+    if r.get("context_overflow"):
+        d["ov"] += 1; continue
+    d["tot"] += 1
+    d["corr"] += bool(r.get("correct"))
+    d["ps"][r["parse_status"]] += 1
+print(f"  {'N':>3} {'graded':>7} {'correct':>8} {'acc':>7} {'overflow':>9}   parse_status")
+for n in sorted(byN):
+    d = byN[n]
+    ps = " ".join(f"{k}={v}" for k, v in d["ps"].most_common())
+    print(f"  {n:>3} {d['tot']:>7} {d['corr']:>8} {d['corr']/max(d['tot'],1):>6.1%} "
+          f"{d['ov']:>9}   {ps}")
+t = sum(d["tot"] for d in byN.values()); c = sum(d["corr"] for d in byN.values())
+print(f"\n  OVERALL {c}/{t} = {c/max(t,1):.1%}  "
+      f"(context_overflow excluded, never counted wrong)")
+
+print("\n  coarse_category on wrong answers:")
+for k, v in collections.Counter(r["coarse_category"] for r in recs
+                                if not r.get("correct")).most_common():
+    print(f"     {k:18s} {v:4d}")
+
+print("\n  accuracy by question_type:")
+bt = collections.defaultdict(lambda: [0, 0])
+for r in recs:
+    if r.get("context_overflow"): continue
+    bt[r["question_type"]][0] += bool(r.get("correct")); bt[r["question_type"]][1] += 1
+for k, (c2, t2) in sorted(bt.items(), key=lambda x: x[1][0] / max(x[1][1], 1)):
+    print(f"     {k:28s} {c2:3d}/{t2:3d} = {c2/max(t2,1):5.1%}")
 PY
 
-echo
 echo "[smoke] done $(date). Report these records to Harshith before the full sweep."
