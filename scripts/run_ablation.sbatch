@@ -56,6 +56,9 @@ export HF_DATASETS_OFFLINE=1
 export VLLM_NO_USAGE_STATS=1
 export DO_NOT_TRACK=1
 export TOKENIZERS_PARALLELISM=false
+# Several array tasks share one repo on Lustre; concurrent .pyc writes
+# from different nodes raced and broke imports in job 305111.
+export PYTHONDONTWRITEBYTECODE=1
 export MPLCONFIGDIR="$PROJ/.mplcache"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-4}"
 mkdir -p "$MPLCONFIGDIR" logs

@@ -110,8 +110,22 @@ if touch "$PROJ/results/.wtest" 2>/dev/null; then rm -f "$PROJ/results/.wtest"; 
 else bad "results/ not writable"; fi
 
 echo "-- 6. regression tests (the generator gate) --"
-if python3 -m pytest "$PROJ/tests" -q >/dev/null 2>&1; then ok "test suite green"
-else bad "test suite FAILING -- do not run a sweep on a broken generator"; fi
+# Array tasks on different nodes run this at the same moment against one repo on
+# Lustre. Writing .pyc concurrently from several nodes raced and produced import
+# failures in 3 of 4 tasks of job 305111, so byte-compilation and the pytest
+# cache are both switched off here. And never swallow the output again: a gate
+# that fails without saying why costs more than the run it protects.
+PYTEST_LOG="$(mktemp)"
+if PYTHONDONTWRITEBYTECODE=1 python3 -m pytest "$PROJ/tests" -q \
+      -p no:cacheprovider >"$PYTEST_LOG" 2>&1; then
+  ok "test suite green"
+else
+  bad "test suite FAILING -- do not run a sweep on a broken generator"
+  echo "  ---- last 25 lines of pytest output ----"
+  tail -25 "$PYTEST_LOG" | sed 's/^/  /'
+  echo "  ---------------------------------------"
+fi
+rm -f "$PYTEST_LOG"
 
 echo "-- 7. one real 5-token generation --"
 if [ "$ON_LOGIN" = "1" ]; then
