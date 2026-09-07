@@ -281,3 +281,44 @@ def test_trajectory_longer_but_diverging_early_still_gets_a_mechanism():
                  "person": q["queried_person"], "counts": pred}, story)
     assert r["first_divergence_index"] == 3
     assert r["label"] != "format_error"
+
+
+# --- degenerate trajectory answers -------------------------------------------
+@pytest.mark.parametrize("pred", [
+    [3, 3, 3, 3, 3, 3, 3],                  # constant
+    [3, 6, 9, 12, 15, 18, 21],              # arithmetic progression
+    [9, 13, 16, 19, 22, 25, 28],            # near-arithmetic (one break)
+])
+def test_formulaic_trajectory_is_not_given_a_mechanism(pred):
+    """Models answer `trajectory` with a formula often enough that these would
+    otherwise inflate omission_1 and binding_person."""
+    story, q = _story_and("trajectory", 12, 12000)
+    if pred == q["gold"]["counts"]:
+        pytest.skip("gold happens to be this sequence")
+    r = _cls(q, {"question_type": "trajectory", "counts": pred}, story)
+    assert r["label"] == "degenerate_sequence"
+    assert r["coarse_category"] == "Degenerate"
+
+
+def test_a_genuinely_constant_gold_trajectory_still_grades_correct():
+    """Someone nobody trades with really does have a flat trajectory."""
+    story = generate_story(12, 12, 12000)
+    for q in sample_questions(story, 12000):
+        if q["question_type"] != "trajectory":
+            continue
+        counts = q["gold"]["counts"]
+        if len(set(counts)) != 1:
+            continue
+        r = _cls(q, {"question_type": "trajectory", "counts": list(counts)}, story)
+        assert r["label"] == "correct"
+        return
+    pytest.skip("no constant trajectory in this story")
+
+
+def test_a_real_tracking_error_still_gets_its_mechanism():
+    """The degenerate check must not swallow ordinary wrong answers."""
+    story, q = _story_and("trajectory", 12, 12000)
+    counts = list(q["gold"]["counts"])
+    counts[4] += 3                       # one perturbed step, not a formula
+    r = _cls(q, {"question_type": "trajectory", "counts": counts}, story)
+    assert r["label"] != "degenerate_sequence"

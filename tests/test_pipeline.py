@@ -43,7 +43,7 @@ def _fake_generation(question, story, mode):
 
 def _record(question, story, raw, finish="stop"):
     parsed, status = parse_answer(raw, finish)
-    graded = grade(question, parsed, story)
+    graded = grade(question, parsed, story, parse_status=status)
     if parsed is None:
         graded["status"] = status
     labels = classify(question, graded, story)
@@ -79,8 +79,31 @@ def test_truncated_heavy_answer_is_format_not_wrong_reasoning():
     story = generate_story(20, 20, 20000)
     q = [x for x in sample_questions(story, 20000) if x["question_type"] == "trajectory"][0]
     raw = '{"question_type": "trajectory", "person": "X", "counts": [1, 2, 3'
-    rec = _record(q, story, raw)
+    rec = _record(q, story, raw, finish="length")
     assert rec["coarse_category"] == "Format"
+
+
+def test_repaired_short_trajectory_is_incomplete_not_a_mechanism():
+    """Repairing delimiters must not turn a truncated list into a 'binding' error."""
+    story = generate_story(20, 20, 20000)
+    q = [x for x in sample_questions(story, 20000) if x["question_type"] == "trajectory"][0]
+    rec = _record(q, story, '{"question_type": "trajectory", "counts": [1, 2, 3', "stop")
+    assert rec["parse_status"] == "ok_repaired"
+    assert rec["label"] == "incomplete_answer"
+    assert rec["coarse_category"] == "Format"
+
+
+def test_missing_closing_brace_is_repaired_not_a_format_error():
+    """Mistral-7B-v0.3 ends most answers one '}' short with finish_reason=stop."""
+    story = generate_story(8, 8, 8000)
+    q = [x for x in sample_questions(story, 8000)
+         if x["question_type"] == "initial_state_lookup"][0]
+    raw = ('{\n  "question_type": "initial_state_lookup",\n  "person": "X",\n'
+           '  "answer": "%d"' % q["gold"]["answer"])
+    rec = _record(q, story, raw, "stop")
+    assert rec["parse_status"] == "ok_repaired"
+    assert rec["correct"], "a complete answer missing only '}' must still count"
+    assert rec["label"] == "correct"
 
 
 def test_every_record_field_is_json_serialisable():

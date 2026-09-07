@@ -235,7 +235,8 @@ def _generate(llm, sampling, cfg, heavy, fits, run_id, model, n, fh):
             comp = out.outputs[0]
             raw, finish = comp.text, comp.finish_reason
             parsed, status = parse_answer(raw, finish)
-            graded = grade(item["question"], parsed, item["story"])
+            graded = grade(item["question"], parsed, item["story"],
+                           parse_status=status)
             if parsed is None:
                 graded["status"] = status
             # Labelling one record must never abort a 5k-prompt sweep. When it

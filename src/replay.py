@@ -6,6 +6,7 @@ made exactly THIS mistake?" — computed from the ground truth, never guessed.
 "dropped the last k transfers the reader saw", not the last k chronologically.
 """
 
+import collections
 def _deltas_touching(story, pid, t):
     """Signed deltas on `pid` up to timestep t, in NARRATION (reading) order."""
     out = []
@@ -99,3 +100,27 @@ def _condition_labels(q, story, a, gold, values, t0_values=None):
     if 0 < abs(a - gold) <= 2:
         labels.append("off_by_small")
     return labels
+
+
+def is_degenerate_sequence(counts, min_len=4):
+    """True if a trajectory answer is a formula rather than a tracked state.
+
+    Models frequently answer `trajectory` with a constant list or an arithmetic
+    progression (`3, 6, 9, 12, ...`) -- 23-64% of trajectory answers in the
+    2026-09-07 sweep, depending on the model. Those coincidentally match
+    `omission_1` or `binding_person` often enough to inflate both categories, so
+    they get their own label and are kept out of the mechanism counts.
+
+    Not applied to correct answers: a person nobody transfers with really does
+    have a constant trajectory.
+    """
+    vals = [c for c in counts if isinstance(c, int)] if counts else []
+    if len(vals) < min_len:
+        return False
+    if len(set(vals)) == 1:
+        return True
+    steps = [vals[i + 1] - vals[i] for i in range(len(vals) - 1)]
+    if len(set(steps)) == 1:
+        return True
+    top, n = collections.Counter(steps).most_common(1)[0]
+    return n >= len(steps) - 1          # one break allowed

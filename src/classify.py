@@ -14,9 +14,10 @@ Three rules keep this honest (PROJECT_PLAN §8):
 import argparse
 import json
 
+from src.grade import OK_STATUSES
 from src.labels import COARSE, FORMAT_STATUSES, PRIORITY
 from src.replay import (_condition_labels, _deltas_touching, _digit_error,
-                        state_value_labels)
+                        is_degenerate_sequence, state_value_labels)
 
 _RANK = {lab: i for i, lab in enumerate(PRIORITY)}
 
@@ -27,7 +28,7 @@ def classify(question, graded, story):
     status, correct = graded["status"], graded["correct"]
     extra = {}
 
-    if status != "ok":
+    if status not in OK_STATUSES:
         lab = FORMAT_STATUSES.get(status, "format_error")
         return _pack([lab], extra)
     if correct:
@@ -52,7 +53,21 @@ def classify(question, graded, story):
         # len(gold)), which is out of range for whichever list is shorter --
         # guarding on len(a) alone crashed on any prediction LONGER than gold.
         n_common = min(len(a), len(gold["counts"]))
-        if graded["detail"]["length_mismatch"] and (div is None or div >= n_common):
+        short_by_repair = (graded["detail"].get("repaired")
+                           and len(a) < len(gold["counts"]))
+        if is_degenerate_sequence(a):
+            # A formula, not a tracked state. Kept out of the mechanism counts:
+            # these match omission_1 / binding_person by coincidence often
+            # enough to inflate both.
+            labels = ["degenerate_sequence"]
+        elif short_by_repair:
+            # Delimiter repair closed a list the model left open. Its length is
+            # an artefact of where generation stopped, not a claim about state,
+            # so it gets a Format label and NO mechanism. A list the model wrote
+            # long, or wrote short with its own closing bracket, is a real
+            # answer and keeps the behaviour below.
+            labels = ["incomplete_answer"]
+        elif graded["detail"]["length_mismatch"] and (div is None or div >= n_common):
             labels = ["format_error"]
         elif div is not None and div < n_common:
             labels = state_value_labels(story, question["queried_person"], div,
