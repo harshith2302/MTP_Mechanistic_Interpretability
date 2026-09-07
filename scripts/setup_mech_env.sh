@@ -1,0 +1,72 @@
+#!/bin/bash
+# LOGIN NODE ONLY -- the GPU nodes have no internet. Run once.
+#
+# Builds envs/mech for the mechanistic phase (nnsight / transformer_lens).
+# Kept separate from envs/eval on purpose: vLLM pins torch hard, and mixing the
+# two produces a venv where one of them silently stops working.
+set -euo pipefail
+
+PROJ="${PROJ:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+export PROJ
+export HF_HOME="$PROJ/hf_cache"
+echo "[mech] PROJ=$PROJ"
+
+# ---------------------------------------------------------------------------
+# THE CUDA 12 PIN IS LOAD-BEARING -- the same trap as envs/eval, different
+# package. Prajna's driver is 570.86.15 = CUDA 12.8 on a40/l40 (dgx is older at
+# 550.144.03 = CUDA 12.4). A torch built for CUDA 13 installs cleanly, imports
+# cleanly, reports device_count() == 1, and still returns False from
+# torch.cuda.is_available() on this cluster. It fails silently, inside the
+# allocation, after the model has loaded.
+#
+# `pip install nnsight transformer_lens` on its own resolves to the newest torch,
+# which is a cu130 wheel. So torch is installed FIRST from the cu128 index and
+# then held there by a constraints file while everything else resolves around
+# it. torch 2.9.0+cu128 is the version already proven end-to-end on an L40S by
+# envs/eval, which is why it is the one pinned here too -- one torch to reason
+# about across both venvs.
+#
+# If you bump this, re-run scripts/probe_gpu.sbatch BEFORE trusting it.
+# ---------------------------------------------------------------------------
+TORCH_PIN="${TORCH_PIN:-2.9.0}"
+CU_INDEX="https://download.pytorch.org/whl/cu128"
+
+python3 -m venv "$PROJ/envs/mech"
+source "$PROJ/envs/mech/bin/activate"
+pip install --upgrade pip
+
+echo "[mech] installing torch==${TORCH_PIN} from the CUDA 12.8 index first"
+pip install "torch==${TORCH_PIN}" --index-url "$CU_INDEX"
+
+CONSTRAINTS="$PROJ/envs/mech-constraints.txt"
+echo "torch==${TORCH_PIN}" > "$CONSTRAINTS"
+
+echo "[mech] installing nnsight / transformer_lens against the pinned torch"
+pip install -c "$CONSTRAINTS" nnsight transformer_lens pandas matplotlib pyyaml pytest
+
+pip freeze > "$PROJ/envs/mech-requirements.lock"
+
+# Fail on the login node rather than 40 minutes into an allocation. The CUDA
+# major version is checkable without a GPU present.
+python - <<'PY'
+import sys, torch
+major = (torch.version.cuda or "0").split(".")[0]
+if major != "12":
+    sys.exit(f"[mech] FATAL: torch is built for CUDA {torch.version.cuda}. "
+             f"Prajna's driver is 12.8; only CUDA 12 wheels can see the GPUs. "
+             f"The constraints file did not hold -- do not use this venv.")
+print(f"[mech] ok: torch {torch.__version__}, CUDA {torch.version.cuda}")
+PY
+
+python -c "
+import nnsight, transformer_lens, torch
+print('[mech] nnsight', nnsight.__version__, '| transformer_lens', transformer_lens.__version__)
+print('[mech] torch', torch.__version__)
+"
+
+echo
+echo "[mech] envs/mech ready, locked to envs/mech-requirements.lock"
+echo "[mech] A renamed venv is a BROKEN venv -- absolute paths are baked into"
+echo "[mech] bin/pip and bin/activate. Rebuild in place, never mv it."
+echo "[mech] Next: sbatch scripts/probe_mech.sbatch to confirm it sees a GPU"
+echo "[mech] and can load a model by local path with no network."
