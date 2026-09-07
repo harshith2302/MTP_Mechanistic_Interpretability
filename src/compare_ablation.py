@@ -41,6 +41,21 @@ def load(run_dir):
     return rows
 
 
+def paired_ci(b, c, n, z=1.96):
+    """95% CI on the paired accuracy difference (digits - words).
+
+    A null result is only worth reporting if it says what it rules out, so the
+    interval matters more than the p-value here.
+    """
+    if n == 0:
+        return (float("nan"), float("nan"))
+    d = (c - b) / n
+    # variance of the paired difference of proportions
+    var = (b + c - (c - b) ** 2 / n) / (n * n)
+    half = z * math.sqrt(max(var, 0.0))
+    return (d - half, d + half)
+
+
 def mcnemar_p(b, c):
     """Exact-ish two-sided McNemar. b, c are the two discordant counts."""
     n = b + c
@@ -75,6 +90,8 @@ def compare(words, digits):
             "delta_digits_minus_words": (d_only - w_only) / tot,
             "words_only_correct": w_only, "digits_only_correct": d_only,
             "mcnemar_p": mcnemar_p(w_only, d_only),
+            "ci_low": paired_ci(w_only, d_only, tot)[0],
+            "ci_high": paired_ci(w_only, d_only, tot)[1],
         })
     return pd.DataFrame(out)
 
@@ -108,8 +125,10 @@ def main():
         tot = g["n_paired"].sum()
         aw = (g["acc_words"] * g["n_paired"]).sum() / tot
         ad = (g["acc_digits"] * g["n_paired"]).sum() / tot
+        lo, hi = paired_ci(w, d, tot)
         print(f"  {model:28s} words {aw:6.1%}  digits {ad:6.1%}  "
-              f"delta {ad - aw:+6.1%}  McNemar p={mcnemar_p(w, d):.4f}  (n={tot})")
+              f"delta {ad - aw:+5.1%}  95% CI [{lo:+.1%}, {hi:+.1%}]  "
+              f"p={mcnemar_p(w, d):.3f}  (n={tot})")
     print(f"\n[ablation] wrote {args.out}")
 
 
