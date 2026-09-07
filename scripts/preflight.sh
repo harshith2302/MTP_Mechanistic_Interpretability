@@ -42,12 +42,61 @@ else
 fi
 
 echo "-- 3. gpu --"
-if command -v nvidia-smi >/dev/null 2>&1; then
-  nvidia-smi --query-gpu=index,name,memory.free --format=csv,noheader | sed 's/^/  /'
+# Prajna login nodes have no GPU at all; only compute nodes do, and srun is
+# restricted to the `interactive` partition. Running preflight on the login node
+# is legitimate (checks 1,2,4,5,6 are the CPU-side gate) -- it must not report a
+# false failure, but it must also refuse to claim the suite passed.
+ON_LOGIN=0
+case "$(hostname -s)" in login*) ON_LOGIN=1 ;; esac
+
+if [ "$ON_LOGIN" = "1" ]; then
+  echo "  [skip] login node -- no GPU here. CPU-side checks only."
+  echo "         For the full gate, submit it as a batch job:"
+  echo "         sbatch -p l40 -q l40 --export=ALL,VENV=envs/eval \\"
+  echo "                scripts/probe_gpu.sbatch"
+elif command -v nvidia-smi >/dev/null 2>&1; then
+  nvidia-smi --query-gpu=index,name,driver_version,memory.free --format=csv,noheader | sed 's/^/  /'
   N=$(nvidia-smi --list-gpus | wc -l)
   [ "$N" -ge 1 ] && ok "$N GPU(s) visible" || bad "no GPU visible"
 else
   bad "nvidia-smi not found -- are you on a compute node?"
+fi
+
+echo "-- 3b. torch can actually USE the gpu --"
+# THE check. Prajna drivers are 570.86.15 = CUDA 12.8. A torch built for CUDA 13
+# (any cu130 wheel, which is what plain `pip install vllm` now resolves to) gets
+# a GPU allocated, sees device_count()==1, and still returns
+# is_available()==False. nvidia-smi looks perfectly healthy throughout, so check
+# 3 alone cannot catch it. Verified 2026-09-07 on cn23-a40 and cn43-l40.
+if [ "$ON_LOGIN" = "1" ]; then
+  python3 - <<'PY'
+import torch
+cu = torch.version.cuda or "?"
+major = cu.split(".")[0]
+print(f"  [info] torch {torch.__version__} built for CUDA {cu}")
+if major >= "13":
+    print(f"  [FAIL] cu{major}x wheel: the GPU nodes run driver 12.8 and this "
+          f"CANNOT see them.")
+    raise SystemExit(1)
+print("  [ ok ] CUDA major 12 -- compatible with the 12.8 driver "
+      "(verify on a GPU node)")
+PY
+  [ $? -eq 0 ] || bad "torch CUDA major version is incompatible with this cluster"
+else
+  python3 - <<'PY'
+import sys, torch
+print(f"  [info] torch {torch.__version__} built for CUDA {torch.version.cuda}")
+if not torch.cuda.is_available():
+    sys.exit(f"  [FAIL] torch.cuda.is_available() is False with "
+             f"{torch.cuda.device_count()} device(s) allocated -- wrong CUDA build.")
+d = torch.cuda.get_device_name(0)
+x = torch.randn(2048, 2048, device="cuda", dtype=torch.bfloat16)
+torch.cuda.synchronize()
+_ = x @ x
+torch.cuda.synchronize()
+print(f"  [ ok ] {d} {torch.cuda.get_device_capability(0)} -- bf16 matmul ran")
+PY
+  [ $? -eq 0 ] || bad "torch cannot use the allocated GPU"
 fi
 
 echo "-- 4. offline flags --"
@@ -65,7 +114,9 @@ if python3 -m pytest "$PROJ/tests" -q >/dev/null 2>&1; then ok "test suite green
 else bad "test suite FAILING -- do not run a sweep on a broken generator"; fi
 
 echo "-- 7. one real 5-token generation --"
-if [ "$FAIL" = "0" ]; then
+if [ "$ON_LOGIN" = "1" ]; then
+  echo "  [skip] login node -- needs a GPU"
+elif [ "$FAIL" = "0" ]; then
   python3 - <<'PY' || FAIL=1
 import os, yaml
 from vllm import LLM, SamplingParams
@@ -83,5 +134,13 @@ else
 fi
 
 echo
-if [ "$FAIL" = "0" ]; then echo "== preflight PASSED =="; exit 0
-else echo "== preflight FAILED -- do not submit =="; exit 1; fi
+if [ "$FAIL" != "0" ]; then
+  echo "== preflight FAILED -- do not submit =="; exit 1
+elif [ "$ON_LOGIN" = "1" ]; then
+  echo "== preflight PASSED (CPU-side only) =="
+  echo "   NOT cleared to submit: the GPU checks were skipped. Re-run inside an"
+  echo "   allocation before the smoke run or the sweep."
+  exit 0
+else
+  echo "== preflight PASSED -- cleared to submit =="; exit 0
+fi

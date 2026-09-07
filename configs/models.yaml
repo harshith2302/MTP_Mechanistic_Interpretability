@@ -9,7 +9,7 @@ models:
     max_context: 32768
     dtype: bfloat16
     gated: false
-    revision: null
+    revision: a09a35458c702b33eeacc393d103063234e8bc28
 
   - short_name: Llama-3.1-8B-Instruct
     hf_repo: meta-llama/Llama-3.1-8B-Instruct
@@ -17,7 +17,7 @@ models:
     max_context: 131072
     dtype: bfloat16
     gated: true
-    revision: null
+    revision: 0e9e39f249a16976918f6564b8830bc894c89659
 
   - short_name: Mistral-7B-Instruct-v0.3
     hf_repo: mistralai/Mistral-7B-Instruct-v0.3
@@ -25,7 +25,7 @@ models:
     max_context: 32768
     dtype: bfloat16
     gated: true
-    revision: null
+    revision: c170c708c41dac9275d15a8fff4eca08d52bab71
 
   # 4096-token context. The story alone exceeds it around N=T~=20.
   # Overflowing prompts are recorded with context_overflow=true and SKIPPED,
@@ -36,4 +36,4 @@ models:
     max_context: 4096
     dtype: bfloat16
     gated: false
-    revision: null
+    revision: 470b1fba1ae01581f270116362ee4aa1b97f4c84
