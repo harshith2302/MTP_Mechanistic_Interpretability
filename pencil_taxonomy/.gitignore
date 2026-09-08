@@ -8,9 +8,6 @@ __pycache__/
 .pytest_cache/
 .mplcache/
 
-# assistant artefacts
-CLAUDE.md
-.claude/
 
 # secrets
 .env

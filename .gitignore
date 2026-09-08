@@ -25,5 +25,4 @@ phase1_local/
 !pencil_taxonomy/results/tables/**
 
 # Assistant artefacts at ANY depth, not just the repo root.
-**/CLAUDE.md
-**/.claude/
+phase1_full_eval/
