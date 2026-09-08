@@ -7,3 +7,9 @@ __pycache__/
 *.pyc
 .mplcache/
 .pytest_cache/
+
+# Phase 1 bulk: environments, weights, caches and raw results.
+# Only the IGNORED entries live here. The tracked phase 1 code moved to
+# phase1_full_eval/, which must NOT be ignored or git mv would drop it
+# from the index.
+phase1_local/
