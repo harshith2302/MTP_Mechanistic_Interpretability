@@ -13,3 +13,17 @@ __pycache__/
 # phase1_full_eval/, which must NOT be ignored or git mv would drop it
 # from the index.
 phase1_local/
+
+# The bare `results/` on line 1 matches at EVERY directory level, so it would
+# silently swallow pencil_taxonomy/results/ and the figures would never be
+# committed -- with no error shown. Re-include them explicitly. A directory must
+# itself be un-ignored before anything inside it can be.
+!pencil_taxonomy/results/
+!pencil_taxonomy/results/figures/
+!pencil_taxonomy/results/figures/**
+!pencil_taxonomy/results/tables/
+!pencil_taxonomy/results/tables/**
+
+# Assistant artefacts at ANY depth, not just the repo root.
+**/CLAUDE.md
+**/.claude/

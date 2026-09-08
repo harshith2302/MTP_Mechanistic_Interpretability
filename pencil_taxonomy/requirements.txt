@@ -1,0 +1,11 @@
+# Pinned to what runs on this cluster: the GPU driver is CUDA 12.8, and any
+# torch built for CUDA 13 gets a GPU allocated but reports
+# torch.cuda.is_available() == False. vllm 0.11.2 is the newest release whose
+# wheel both installs on glibc 2.28 and pulls a cu12 torch.
+vllm==0.11.2
+transformers
+num2words
+pyyaml
+pandas
+matplotlib
+pytest

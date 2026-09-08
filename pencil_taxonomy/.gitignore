@@ -1,0 +1,29 @@
+# environments and caches
+envs/
+.venv/
+venv/
+models/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mplcache/
+
+# assistant artefacts
+CLAUDE.md
+.claude/
+
+# secrets
+.env
+*.token
+
+# cluster artefacts
+logs/
+slurm-*.out
+*.log
+
+# regenerable from config.yaml seeds
+data/
+results/raw/
+results/smoke/
+
+# keep: results/figures/  results/tables/

@@ -1,0 +1,9 @@
+Below is a description of a pencil exchange.
+
+{story_text}
+
+Question:
+At timestep {timestep}, how many pencils did {person} give to {receiver}?
+
+{format_instruction}
+{"answer": <integer>}

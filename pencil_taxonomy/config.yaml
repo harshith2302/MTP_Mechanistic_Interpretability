@@ -1,0 +1,106 @@
+# pencil_taxonomy. Every number the experiment depends on lives here.
+#
+# ---------------------------------------------------------------------------
+# ADDING A NEW MODEL
+#
+# One edit, in this file. Append an entry to `models:` below:
+#
+#   - key: <short-key>            # your handle for it; used on the command line
+#     hf_id: <org>/<repo>         # provenance and reporting only, never loaded
+#     local_path: models/<dir>    # weights must already be on disk here
+#     max_context: <int>          # from the model's config.json
+#     use_system_role: true       # false if its chat template rejects a system
+#                                 # turn (Mistral-v0.3 does). Getting this wrong
+#                                 # silently depresses one model and looks like
+#                                 # a finding, so tests assert it.
+#
+# Then, from the repo root:
+#
+#   mkdir -p logs
+#   sbatch scripts/run_model.sbatch <short-key>
+#   python -m src.aggregate && python -m src.plots
+#
+# Nothing else changes. The grid, seeds, prompts and sampling below are shared,
+# so a new model is directly comparable with the four already run: the frozen
+# templates in prompts/ are reused and every record stores their template_sha256
+# alongside prompt_sha256, which is what proves the comparison is like-for-like.
+#
+# Compute nodes are air-gapped -- copy the weights to local_path FIRST. Nothing
+# here downloads anything.
+# ---------------------------------------------------------------------------
+
+grid:
+  # Denser below N=12, where accuracy moves. Above it the curve is expected flat,
+  # so those points only need to confirm the floor exists.
+  n_values: [2, 4, 6, 8, 10, 12, 16, 20, 24, 30]
+  stories_per_n: 30          # -> 300 stories, 30 questions per (N, type, model)
+
+story:
+  # The original pencil setting, unchanged. pencils_per_person is FIXED, so total
+  # pencils scale with N -- this confounds tracking depth with arithmetic
+  # magnitude on purpose, to stay comparable. Reported as a limitation.
+  pencils_per_person: 5
+  number_word_probability: 0.45
+  names_path: data/names.txt
+  seed_base: 700000          # story_seed = seed_base + 1000*N + story_index
+
+question_types:
+  - initial_state_lookup
+  - transfer_recall
+  - person_timestep_lookup
+  - state_snapshot
+  - trajectory
+
+# Loaded by LOCAL PATH, never by hf_id. The compute nodes on this cluster have
+# no network, so a stray repo-id lookup would fail mid-job; hf_id is kept for
+# provenance and reporting only. Weights live in models/ (gitignored) and were
+# copied in once -- this repo does not read them from anywhere else.
+models:
+  - key: qwen
+    hf_id: Qwen/Qwen2.5-7B-Instruct
+    local_path: models/Qwen2.5-7B-Instruct
+    max_context: 32768
+    use_system_role: true
+  - key: llama
+    hf_id: meta-llama/Llama-3.1-8B-Instruct
+    local_path: models/Llama-3.1-8B-Instruct
+    max_context: 131072
+    use_system_role: true
+  - key: mistral
+    hf_id: mistralai/Mistral-7B-Instruct-v0.3
+    local_path: models/Mistral-7B-Instruct-v0.3
+    max_context: 32768
+    # Mistral-v0.3's chat template rejects a system turn. Schema and format
+    # instruction are folded into the user turn instead. Asserted in tests --
+    # getting this wrong silently depresses one model and looks like a finding.
+    use_system_role: false
+  - key: olmo
+    hf_id: allenai/OLMo-2-1124-7B-Instruct
+    local_path: models/OLMo-2-1124-7B-Instruct
+    max_context: 4096        # overflows around N=22; see plots.min_cell_coverage
+    use_system_role: true
+
+generation:
+  temperature: 0.0           # greedy
+  top_p: 1.0
+  seed: 0
+  dtype: bfloat16
+  tensor_parallel_size: 1    # greedy is not bit-identical across TP / batch --
+  max_num_seqs: 64           # both fixed for the whole sweep and stored per record
+  max_tokens:
+    scalar: 128              # types 1-3
+    state_snapshot_base: 128 # + 16 * N
+    trajectory_base: 128     # + 16 * (T+1)
+    per_unit: 16
+
+taxonomy:
+  chance_draws: 1000         # Monte Carlo draws per wrong answer for the null
+  chance_seed: 0
+  # Per-N slices do not have the counts to support them; pool, or use two bins.
+  pool_bins: [[2, 8], [16, 30]]
+
+plots:
+  # A cell that overflow emptied is a biased subsample of short stories, not the
+  # model's accuracy at that N. Drop it and log which.
+  min_cell_coverage: 0.5
+  min_divergence_cell: 5     # fig 4: drop cells with <5 surviving answers
