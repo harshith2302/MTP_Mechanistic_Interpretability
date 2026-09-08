@@ -1,0 +1,200 @@
+{
+ "_comment": [
+  "The worked example from the v2 spec, section 5. WINNERS are the spec's, verified",
+  "row by row, EXCEPT a=16 (see below). The `fires` lists are the COMPLETE match",
+  "sets computed from the spec's own rules -- the spec's table under-listed them,",
+  "because B3 arithmetic_slip and B6 digit_error fire on almost anything near y.",
+  "",
+  "Three departures from the written spec, all forced by its own internal logic:",
+  " 1. A2 partial_update is 0 <= s < t, not 0 < s < t. Section 4.1 requires",
+  "    A1 subset-of A2 and the a=13 row lists both; excluding s=0 makes that",
+  "    unsatisfiable.",
+  " 2. a=15: the spec lists A3 lookahead, but that needs M[s] for s>5 = {14,17,17}",
+  "    and 15 is not among them. A2 fires instead (M[3]=M[4]=15). Winner unchanged.",
+  " 3. a=16: the spec's winner is arithmetic_slip, but B1 direction_single genuinely",
+  "    fires -- y - 2*delta = 14 - 2*(-1) = 16, using the t=5 transfer -- and B1",
+  "    outranks B3 in the spec's own priority order. Winner is direction_single.",
+  "",
+  "Mean matches per answer here is 2.0, and 5 of 15 answers match 3+ rules. The",
+  "spec called this 'three separate three-way collisions'; the real figure is worse,",
+  "which is itself evidence for the spec's warning that v2 discriminates poorly."
+ ],
+ "setup": {
+  "N": 8,
+  "T": 8,
+  "t": 5,
+  "P": "Ravi",
+  "cluster": [
+   "Ravi",
+   "Sita",
+   "Gita"
+  ],
+  "tot_K": 41,
+  "ravi_column": [
+   13,
+   9,
+   9,
+   15,
+   15,
+   14,
+   14,
+   17,
+   17
+  ],
+  "transfers": [
+   [
+    1,
+    "Ravi",
+    "Sita",
+    4
+   ],
+   [
+    3,
+    "Gita",
+    "Ravi",
+    6
+   ],
+   [
+    5,
+    "Ravi",
+    "Gita",
+    1
+   ],
+   [
+    7,
+    "Sita",
+    "Ravi",
+    3
+   ]
+  ],
+  "M_at_t5": {
+   "Ravi": 14,
+   "Sita": 25,
+   "Gita": 2,
+   "Abdul": 30
+  },
+  "y": 14
+ },
+ "rows": [
+  {
+   "answer": 13,
+   "fires": [
+    "stale",
+    "transfer_doubled",
+    "partial_update",
+    "digit_error",
+    "arithmetic_slip"
+   ],
+   "winner": "stale"
+  },
+  {
+   "answer": 9,
+   "fires": [
+    "partial_update"
+   ],
+   "winner": "partial_update"
+  },
+  {
+   "answer": 17,
+   "fires": [
+    "lookahead",
+    "digit_error"
+   ],
+   "winner": "lookahead"
+  },
+  {
+   "answer": 15,
+   "fires": [
+    "boundary_off_by_one",
+    "transfer_omitted",
+    "partial_update",
+    "digit_error",
+    "arithmetic_slip"
+   ],
+   "winner": "boundary_off_by_one"
+  },
+  {
+   "answer": 8,
+   "fires": [
+    "transfer_omitted"
+   ],
+   "winner": "transfer_omitted"
+  },
+  {
+   "answer": 20,
+   "fires": [
+    "transfer_doubled"
+   ],
+   "winner": "transfer_doubled"
+  },
+  {
+   "answer": 2,
+   "fires": [
+    "direction_single",
+    "wrong_person_same_cluster"
+   ],
+   "winner": "direction_single"
+  },
+  {
+   "answer": 12,
+   "fires": [
+    "direction_global",
+    "digit_error",
+    "arithmetic_slip"
+   ],
+   "winner": "direction_global"
+  },
+  {
+   "answer": 16,
+   "fires": [
+    "direction_single",
+    "digit_error",
+    "arithmetic_slip"
+   ],
+   "winner": "direction_single"
+  },
+  {
+   "answer": 41,
+   "fires": [
+    "conservation_total",
+    "digit_error"
+   ],
+   "winner": "conservation_total"
+  },
+  {
+   "answer": 87,
+   "fires": [
+    "out_of_range"
+   ],
+   "winner": "out_of_range"
+  },
+  {
+   "answer": 25,
+   "fires": [
+    "wrong_person_same_cluster"
+   ],
+   "winner": "wrong_person_same_cluster"
+  },
+  {
+   "answer": 30,
+   "fires": [
+    "wrong_person_other_cluster"
+   ],
+   "winner": "wrong_person_other_cluster"
+  },
+  {
+   "answer": 6,
+   "fires": [
+    "delta_readout"
+   ],
+   "winner": "delta_readout"
+  },
+  {
+   "answer": 33,
+   "fires": [
+    "unexplained"
+   ],
+   "winner": "unexplained"
+  }
+ ]
+}

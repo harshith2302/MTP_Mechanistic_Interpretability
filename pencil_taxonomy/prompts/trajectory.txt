@@ -1,0 +1,10 @@
+Below is a description of a pencil exchange.
+
+{story_text}
+
+Question:
+List how many pencils {person} had at each timestep from 0 to {t_max}, in order.
+The list must contain exactly {n_values} numbers.
+
+{format_instruction}
+{"answer": [<integer>, ...]}

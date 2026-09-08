@@ -1,0 +1,10 @@
+Below is a description of a pencil exchange.
+
+{story_text}
+
+Question:
+How many pencils did each person have at timestep {timestep}? Include every one
+of the {n_people} people.
+
+{format_instruction}
+{"answer": {"<person name>": <integer>, ...}}
