@@ -17,8 +17,10 @@ Mistral-7B-Instruct-v0.3 and OLMo-2-1124-7B-Instruct.
 
 **1. Binding survives; accumulation does not.** `initial_state_lookup` — "how
 many pencils did X hold at timestep 0?", answerable by copying one number from
-the prompt — stays at **100% at N=12 and 83% at N=30**. Over the same range
-`trajectory` and `state_snapshot` fall to **0%**. The models can still bind a
+the prompt — stays at **100% at N=12** for all four models, and **87% at N=30**
+(Llama-3.1 97%, Qwen2.5 83%, Mistral 80%; OLMo-2 is past its context window by
+then). Over the same range `trajectory` is at **0%** throughout and
+`state_snapshot` falls from 7% to **0%**. The models can still bind a
 person to a value in a 30-person list while being unable to carry that value
 through a single update.
 
@@ -160,7 +162,7 @@ format, and finds nothing.
 
 | | hypothesis | verdict |
 |---|---|---|
-| H1 | **Binding** — larger N corrupts person↔value association | **Largely rejected.** `initial_state_lookup` is at 100% (N=12) and 83% (N=30). Binding errors are real but small (+4.8). |
+| H1 | **Binding** — larger N corrupts person↔value association | **Largely rejected.** `initial_state_lookup` is at 100% (N=12) and 87% (N=30) averaged over the models still in context. Binding errors are real but small (+4.8). |
 | H2 | **Retrieval** — transfers looked up at query time | **Partly supported.** `transfer_recall` degrades 93%→33%, so retrieving a narrated event does get harder — but it stays far above the accumulation questions, so retrieval alone cannot explain them. |
 | H3 | **State update** — the running state drifts | **Supported, with one correction: it does not drift, it fails at once.** First divergence is flat at 1–2 for every T. |
 | H4 | **Arithmetic** | **Supported as the largest interpretable component** (+12.1), but the digits ablation shows it is not about number form. |
