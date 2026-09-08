@@ -8,7 +8,7 @@ __pycache__/
 .pytest_cache/
 .mplcache/
 
-# assistant artefacts
+
 # secrets
 .env
 *.token

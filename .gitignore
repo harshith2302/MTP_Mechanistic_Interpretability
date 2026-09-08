@@ -25,3 +25,4 @@ phase1_local/
 !pencil_taxonomy/results/tables/**
 
 # Assistant artefacts at ANY depth, not just the repo root.
+phase1_full_eval/
