@@ -9,6 +9,50 @@ one that explains what the words and the graphs mean.
 
 ---
 
+## Summary
+
+**What we built.** A synthetic state-tracking benchmark. `N` people pass pencils
+over `T` timesteps; the model reads the story as prose and answers questions about
+who holds what. Because we generate the stories, every answer has one exactly
+computable truth, and every wrong answer can be checked against a replay of what
+the model *would* have said under a specific mistake.
+
+**What we ran.** 4 open-weight models (Qwen2.5-7B, Llama-3.1-8B, Mistral-7B-v0.3,
+OLMo-2-7B) × 15 story sizes (`N = T` = 2…30) × 15 stories × 22 questions of 12
+types = **19,796 answers**, greedy decoding, no constrained JSON. Plus a 6,600-record
+ablation. Every wrong answer is auto-classified into a failure taxonomy and
+corrected against a chance baseline.
+
+**What we found.**
+
+1. **Accuracy does not collapse to zero — it falls to a ~22% floor by `N ≈ 12` and
+   flattens.** All four models are indistinguishable past that point, and the floor
+   is carried by the easy question types, not by residual skill.
+2. **Retrieval survives; accumulation does not.** The zero-arithmetic control
+   (`initial_state_lookup`) stays at 100% through `N=12` and 87% at `N=30`
+   (Llama 97%, Qwen 83%, Mistral 80%; OLMo-2 is out of context by then), while
+   `trajectory` and `state_snapshot` fall to 0% over the same stories. Models can
+   still find a person's number in a 30-person list; they cannot carry it through a
+   single update.
+3. **The failure is at the *first* update, not gradual drift.** On the trajectory
+   question, models reproduce the stated `t=0` value and leave the true sequence at
+   index 1–2 regardless of how long the story is.
+4. **Number surface form is irrelevant.** Rendering every number as a digit instead
+   of a word changes nothing (paired test, all |Δ| < 2.1 points, min p = 0.092).
+
+**What to be careful about.** After chance correction only three failure
+categories stand up strongly — Arithmetic, Omission and Binding. 29% of wrong
+answers are `Unexplained`, at or slightly below its own chance rate, so the
+taxonomy does not cover everything. Two confounds are deliberate and are not
+smoothed over: `N` grows arithmetic difficulty alongside tracking difficulty, and
+the story is narrated out of chronological order, so the task measures tracking
+*plus* narrative reordering. See section 11.
+
+**Status.** The evaluation and taxonomy are complete. No mechanistic
+interpretability work has been done — that is a separate phase, not yet started.
+
+---
+
 ## 1. What the benchmark is
 
 `N` people pass pencils to each other over `T` timesteps. The total number of
