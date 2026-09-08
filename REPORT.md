@@ -23,8 +23,11 @@ person to a value in a 30-person list while being unable to carry that value
 through a single update.
 
 **2. Tracking fails at the first update, not by drift.** Mean
-`first_divergence_index` on the `trajectory` question is a flat **1.0–2.0 at
-every T**, against a perfect-tracking reference of `y = T`. Models reproduce
+`first_divergence_index` on the `trajectory` question is a flat **1.0–2.0 in
+every well-powered cell**, against a perfect-tracking reference of `y = T`.
+(Eight cells fall to 0.25–0.80, all of them Qwen2.5 or OLMo-2 at high N where
+`degenerate_sequence` exclusions leave only 2–5 diverging answers; they move the
+estimate down, never up, so the conclusion is unaffected.) Models reproduce
 `t = 0` and then leave the true trajectory immediately. There is no regime in
 which they track for a while and gradually decay.
 
