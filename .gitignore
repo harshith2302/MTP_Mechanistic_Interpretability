@@ -26,3 +26,39 @@ phase1_local/
 
 # Assistant artefacts at ANY depth, not just the repo root.
 phase1_full_eval/
+
+# Working folders that stay local: earlier attempts, scratch runs, archived work.
+/pencil_probing_v1/
+/pencil_counts_prev/
+/probing/
+/phase1_local/
+
+# --- pencil_counts ------------------------------------------------------------
+# Code and README track by default. results/ is swallowed by the bare `results/`
+# rule at the top of this file; re-open it for the published PNG figures only --
+# no activations, no per-prompt answers, no pilot run, no PDFs.
+!pencil_counts/results/
+/pencil_counts/results/*
+!/pencil_counts/results/figures/
+!/pencil_counts/results/llama/
+!/pencil_counts/results/qwen/
+!/pencil_counts/results/mistral/
+!/pencil_counts/results/olmo/
+/pencil_counts/results/*/*
+!/pencil_counts/results/*/figures/
+/pencil_counts/results/*/figures/*
+!/pencil_counts/results/*/figures/*.png
+!/pencil_counts/results/figures/*.png
+/pencil_counts/hf_cache/
+
+# --- pencil_taxonomy_simple ---------------------------------------------------
+# Same idea: code, config, reports and the PNG figures. The folder's own
+# .gitignore keeps the regenerable stories and the raw model output out.
+!pencil_taxonomy_simple/results/
+/pencil_taxonomy_simple/results/*
+!/pencil_taxonomy_simple/results/figures/
+/pencil_taxonomy_simple/results/figures/*
+!/pencil_taxonomy_simple/results/figures/*.png
+/pencil_taxonomy_simple/prompts/
+/pencil_taxonomy_simple/models
+/pencil_taxonomy_simple/envs

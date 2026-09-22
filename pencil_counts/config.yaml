@@ -1,0 +1,25 @@
+# pencil_counts -- every number the experiment depends on.
+
+seed: 2026                 # stories: names, partition, transfers, word/digit choice
+split_seed: 0              # train/val/test assignment, hashed per story
+n_stories: 12000
+splits: {train: 0.70, val: 0.15, test: 0.15}
+
+n_people: [5, 6, 7, 8, 9]
+totals: [12, 18, 24, 30, 36]
+timesteps: [0, 1, 3, 5, 8, 12]   # exactly one transfer per timestep
+number_word_probability: 0.45    # "seven" instead of "7", per number, as in pencil_taxonomy_simple
+
+use_chat_template: true    # user turn = story + question, "Answer: " prefilled in the assistant turn
+
+model: llama               # which of the models below to run (also: MODEL=qwen bash run.sh)
+models:                    # local weights, nothing downloaded; tl_name is what TransformerLens is asked for
+  llama:   {path: ../pencil_taxonomy/models/Llama-3.1-8B-Instruct,    tl_name: meta-llama/Llama-3.1-8B-Instruct}
+  qwen:    {path: ../pencil_taxonomy/models/Qwen2.5-7B-Instruct,      tl_name: Qwen/Qwen2.5-7B-Instruct}
+  mistral: {path: ../pencil_taxonomy/models/Mistral-7B-Instruct-v0.3, tl_name: mistralai/Mistral-7B-Instruct-v0.1}  # v0.3 not in TL's list; same architecture, config read from the local path
+  olmo:    {path: ../pencil_taxonomy/models/OLMo-2-1124-7B-Instruct,  tl_name: allenai/OLMo-2-1124-7B}
+hf_cache: hf_cache         # TransformerLens only accepts hub names, and looks their config up online:
+                           # each model's local config.json is mirrored here so the GPU node needs no network
+batch_size: 16
+
+probe: {C: 1.0, max_iter: 2000, class_weight: balanced, shuffle_seed: 1, n_jobs: 16}

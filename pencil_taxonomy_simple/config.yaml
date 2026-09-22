@@ -1,0 +1,103 @@
+# pencil_taxonomy_simple. Every number the experiment depends on lives here.
+#
+# What is different from pencil_taxonomy:
+#   * the story generator has NO clusters, so narration is chronological;
+#   * N and T are swept INDEPENDENTLY (a grid), not locked to N = T;
+#   * the prompt states the rules of the account, and an answer mode can let
+#     the model reason before answering.
+# Everything else -- name bag, initial partition, transfer sampling, sentence
+# templates, number-word mixing, the five question types, the grader and the
+# taxonomy -- is the same, so results are comparable on the N = T diagonal.
+#
+# ---------------------------------------------------------------------------
+# ADDING A NEW MODEL: append an entry to `models:` (see the shape below), copy
+# the weights to local_path (compute nodes are air-gapped), then from this dir:
+#     mkdir -p logs && sbatch scripts/run_model.sbatch <key>
+#     python -m src.aggregate --run-dir results/raw/<run_id> && python -m src.plots
+# ---------------------------------------------------------------------------
+
+grid:
+  # (N, T) grid. T is dense where accuracy moves (T <= 8) and coarser above.
+  # Every cell gets `stories_per_cell` stories; the N = T cells that fall on the
+  # grid get `diagonal_stories` so the 2-D comparison plot has the same footing
+  # (n = 30 per point) as pencil_taxonomy did.
+  n_values: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+             21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+  t_values: [1, 2, 3, 5, 8, 12, 16, 20, 25, 30]
+  stories_per_cell: 5
+  # The N = T cells pencil_taxonomy ran, always included (whether or not T is in
+  # t_values) with `diagonal_stories` each, so figures 1-4 share an x-axis with
+  # that experiment and can be laid side by side.
+  diagonal_n_values: [2, 4, 6, 8, 10, 12, 16, 20, 24, 30]
+  diagonal_stories: 30
+
+story:
+  pencils_per_person: 5          # fixed, as before: total pencils scale with N
+  number_word_probability: 0.45
+  names_path: data/names.txt
+  seed_base: 900000              # story_seed = seed_base + 10000*N + 100*T + i
+  # "random" -> randint(1, N) transfers per timestep, as the original did.
+  # An integer k -> exactly k per timestep. Set to 1, so T IS the number of
+  # transactions and N=2, T=1 is the smallest possible puzzle: one transfer.
+  transfers_per_timestep: 1
+
+question_types:
+  - initial_state_lookup
+  - transfer_recall
+  - person_timestep_lookup
+  - state_snapshot
+  - trajectory
+
+# Loaded by LOCAL PATH, never by hf_id: compute nodes have no network. hf_id is
+# provenance only. Weights live in models/ (gitignored; here a symlink to
+# ../pencil_taxonomy/models so the 57 GB is not duplicated).
+models:
+  - key: qwen
+    hf_id: Qwen/Qwen2.5-7B-Instruct
+    local_path: models/Qwen2.5-7B-Instruct
+    max_context: 32768
+    use_system_role: true
+  - key: llama
+    hf_id: meta-llama/Llama-3.1-8B-Instruct
+    local_path: models/Llama-3.1-8B-Instruct
+    max_context: 131072
+    use_system_role: true
+  - key: mistral
+    hf_id: mistralai/Mistral-7B-Instruct-v0.3
+    local_path: models/Mistral-7B-Instruct-v0.3
+    max_context: 32768
+    use_system_role: false     # its chat template rejects a system turn
+  - key: olmo
+    hf_id: allenai/OLMo-2-1124-7B-Instruct
+    local_path: models/OLMo-2-1124-7B-Instruct
+    max_context: 4096          # overflows at large N*T; excluded, never scored 0
+    use_system_role: true
+
+generation:
+  # direct     = JSON only, one forward pass (comparable with pencil_taxonomy)
+  # scratchpad = tally first, then JSON on the last line (parsed as LAST object)
+  answer_mode: direct
+  temperature: 0.0             # greedy
+  top_p: 1.0
+  seed: 0
+  dtype: bfloat16
+  tensor_parallel_size: 1      # greedy is not bit-identical across TP / batch --
+  max_num_seqs: 64             # both fixed for a whole sweep and stored per record
+  max_tokens:
+    scalar: 128
+    state_snapshot_base: 128   # + per_unit * N
+    trajectory_base: 128       # + per_unit * (T+1)
+    per_unit: 16
+    scratchpad:                # added only when answer_mode == scratchpad
+      base: 160
+      per_transfer: 24         # x number of transfers in the story (a full
+                               # replay is one line per transfer); capped at
+                               # what the context window can still hold
+
+taxonomy:
+  chance_draws: 1000
+  chance_seed: 0
+
+plots:
+  min_cell_coverage: 0.5       # drop overflow-emptied cells; never plot as 0
+  min_divergence_cell: 5
