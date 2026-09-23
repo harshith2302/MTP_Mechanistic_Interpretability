@@ -62,3 +62,22 @@ phase1_full_eval/
 /pencil_taxonomy_simple/prompts/
 /pencil_taxonomy_simple/models
 /pencil_taxonomy_simple/envs
+
+# --- pencil_scale -------------------------------------------------------------
+# Code, README and the report track by default. Of results/ -- swallowed by the
+# bare `results/` rule at the top -- keep only the published PNG figures: no
+# activations, no per-prompt answers, no pilot run, no PDFs.
+!pencil_scale/results/
+/pencil_scale/results/*
+!/pencil_scale/results/figures/
+!/pencil_scale/results/llama/
+!/pencil_scale/results/qwen/
+!/pencil_scale/results/mistral/
+!/pencil_scale/results/olmo/
+/pencil_scale/results/*/*
+!/pencil_scale/results/*/figures/
+/pencil_scale/results/*/figures/*
+!/pencil_scale/results/*/figures/*.png
+!/pencil_scale/results/figures/*.png
+/pencil_scale/hf_cache/
+/pencil_scale/STATUS.md

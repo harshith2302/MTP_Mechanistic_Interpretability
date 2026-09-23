@@ -1,0 +1,37 @@
+# pencil_scale -- every number the experiment depends on.
+
+seed: 4242
+split_seed: 0
+n_stories: 12000
+splits: {train: 0.70, val: 0.15, test: 0.15}   # the random protocol
+
+n_people: [5, 6, 7, 8, 9]
+total_min: 10                # every integer in [total_min, total_max] is a possible answer
+total_max: 60
+timesteps: [0, 1, 3, 5, 8, 12]
+number_word_probability: 0.45
+
+# The two protocols that test whether the read-out is numeric rather than a
+# lookup over seen answers. Both are defined by the VALUE, not by the story.
+held_out_totals: [17, 23, 31, 43, 52]   # never trained on, tested on: interpolation
+extrapolation_train_max: 45             # train on <= this, test above it
+
+# Where in the prompt the residual stream is read. "answer" is what
+# pencil_counts used; the rest ask whether the quantity is only there.
+positions: [first_token, allocation_end, last_transfer, question_end, answer]
+
+use_chat_template: true
+model: llama
+models:
+  llama:   {path: ../pencil_taxonomy/models/Llama-3.1-8B-Instruct,    tl_name: meta-llama/Llama-3.1-8B-Instruct}
+  qwen:    {path: ../pencil_taxonomy/models/Qwen2.5-7B-Instruct,      tl_name: Qwen/Qwen2.5-7B-Instruct}
+  mistral: {path: ../pencil_taxonomy/models/Mistral-7B-Instruct-v0.3, tl_name: mistralai/Mistral-7B-Instruct-v0.1}
+  olmo:    {path: ../pencil_taxonomy/models/OLMo-2-1124-7B-Instruct,  tl_name: allenai/OLMo-2-1124-7B}
+hf_cache: hf_cache
+batch_size: 16
+
+probe:
+  alphas: [1.0, 10.0, 100.0, 1000.0]   # ridge, chosen on the validation split
+  mlp_hidden: 256                      # the non-linear comparison, at the best cells only
+  mlp_max_iter: 400
+  n_jobs: 16
